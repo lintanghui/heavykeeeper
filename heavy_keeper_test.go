@@ -24,8 +24,13 @@ func TestTopkList(t *testing.T) {
 
 func BenchmarkAdd(b *testing.B) {
 	zipf := rand.NewZipf(rand.New(rand.NewSource(time.Now().Unix())), 2, 2, 1000)
+	var data []string = make([]string, 1000)
+	for i := 0; i < 1000; i++ {
+		data[i] = strconv.FormatUint(zipf.Uint64(), 10)
+	}
 	topk := New(10, 1000, 5, 0.9)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		topk.Add(strconv.FormatUint(zipf.Uint64(), 10), 1)
+		topk.Add(data[i%1000], 1)
 	}
 }

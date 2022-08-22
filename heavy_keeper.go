@@ -3,6 +3,7 @@ package heavykeeper
 import (
 	"math"
 	"math/rand"
+	"unsafe"
 
 	"github.com/lintanghui/heavykeeper/pkg/minheap"
 	"github.com/spaolacci/murmur3"
@@ -53,14 +54,14 @@ func (topk *TopK) List() []minheap.Node {
 }
 
 func (topk *TopK) Add(item string, incr uint32) string {
-	itemFingerprint := murmur3.Sum32([]byte(item))
-
+	bs := StringToBytes(item)
+	itemFingerprint := murmur3.Sum32(bs)
 	var maxCount uint32
 
 	// compute d hashes
 	for i := uint32(0); i < topk.depth; i++ {
 
-		bucketNumber := murmur3.Sum32WithSeed([]byte(item), uint32(i)) % uint32(topk.width)
+		bucketNumber := murmur3.Sum32WithSeed(bs, uint32(i)) % uint32(topk.width)
 
 		fingerprint := topk.buckets[i][bucketNumber].fingerprint
 		count := topk.buckets[i][bucketNumber].count
@@ -125,4 +126,13 @@ func max(x, y uint32) uint32 {
 		return x
 	}
 	return y
+}
+
+func StringToBytes(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(
+		&struct {
+			string
+			Cap int
+		}{s, len(s)},
+	))
 }
