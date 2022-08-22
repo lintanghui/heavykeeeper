@@ -90,7 +90,10 @@ func (topk *TopK) Add(item string, incr uint32) string {
 			}
 		}
 	}
-
+	minHeap := topk.minHeap.Min()
+	if len(topk.minHeap.Nodes) == int(topk.k) && maxCount < minHeap {
+		return ""
+	}
 	itemHeapIdx, itemHeapExist := topk.minHeap.Find(item)
 	if itemHeapExist {
 		topk.minHeap.Fix(itemHeapIdx, maxCount)

@@ -3,6 +3,7 @@ package heavykeeper
 import (
 	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,4 +34,24 @@ func BenchmarkAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		topk.Add(data[i%1000], 1)
 	}
+}
+
+func BenchmarkAddwithLock(b *testing.B) {
+	zipf := rand.NewZipf(rand.New(rand.NewSource(time.Now().Unix())), 2, 2, 1000)
+	var data []string = make([]string, 1000)
+	for i := 0; i < 1000; i++ {
+		data[i] = strconv.FormatUint(zipf.Uint64(), 10)
+	}
+	mutex := sync.Mutex{}
+	topk := New(10, 1000, 5, 0.9)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			i++
+			mutex.Lock()
+			topk.Add(data[i%1000], 1)
+			mutex.Unlock()
+		}
+	})
 }
