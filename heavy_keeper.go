@@ -18,9 +18,7 @@ type TopK struct {
 	minHeap *minheap.Heap
 }
 
-func New(workers int, k, width, depth uint32, decay float64) *TopK {
-	// err check...
-
+func New(k, width, depth uint32, decay float64) *TopK {
 	arrays := make([][]bucket, depth)
 	for i := range arrays {
 		arrays[i] = make([]bucket, width)
@@ -58,7 +56,6 @@ func (topk *TopK) Add(item string, incr uint32) string {
 	itemFingerprint := murmur3.Sum32([]byte(item))
 
 	var maxCount uint32
-	heapMin := topk.minHeap.Min()
 
 	// compute d hashes
 	for i := uint32(0); i < topk.depth; i++ {
@@ -93,16 +90,14 @@ func (topk *TopK) Add(item string, incr uint32) string {
 		}
 	}
 
-	if maxCount > heapMin {
-		itemHeapIdx, itemHeapExist := topk.minHeap.Find(item)
-		if itemHeapExist {
-			topk.minHeap.Fix(itemHeapIdx, maxCount)
-		} else {
-			expelled := topk.minHeap.Pop()
-			topk.minHeap.Add(minheap.Node{Item: item, Count: maxCount})
-			return expelled.Item
-		}
+	itemHeapIdx, itemHeapExist := topk.minHeap.Find(item)
+	if itemHeapExist {
+		topk.minHeap.Fix(itemHeapIdx, maxCount)
+	} else {
+		expelled := topk.minHeap.Add(minheap.Node{Item: item, Count: maxCount})
+		return expelled
 	}
+
 	return ""
 }
 
