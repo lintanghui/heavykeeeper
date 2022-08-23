@@ -53,36 +53,38 @@ func (topk *TopK) List() []minheap.Node {
 	return topk.minHeap.Sorted()
 }
 
-func (topk *TopK) Add(item string, incr uint32) string {
+// Add add item into heavykeeper and return if item had beend add into minheap.
+// if item had been add into minheap and some item was expelled, return the expelled item.
+func (topk *TopK) Add(item string, incr uint32) (string, bool) {
 	bs := StringToBytes(item)
 	itemFingerprint := murmur3.Sum32(bs)
 	var maxCount uint32
 
 	// compute d hashes
-	for i := uint32(0); i < topk.depth; i++ {
+	for i, row := range topk.buckets {
 
 		bucketNumber := murmur3.Sum32WithSeed(bs, uint32(i)) % uint32(topk.width)
 
-		fingerprint := topk.buckets[i][bucketNumber].fingerprint
-		count := topk.buckets[i][bucketNumber].count
+		fingerprint := row[bucketNumber].fingerprint
+		count := row[bucketNumber].count
 
 		if count == 0 {
-			topk.buckets[i][bucketNumber].fingerprint = itemFingerprint
-			topk.buckets[i][bucketNumber].count = incr
+			row[bucketNumber].fingerprint = itemFingerprint
+			row[bucketNumber].count = incr
 			maxCount = max(maxCount, incr)
 
 		} else if fingerprint == itemFingerprint {
-			topk.buckets[i][bucketNumber].count += incr
-			maxCount = max(maxCount, topk.buckets[i][bucketNumber].count)
+			row[bucketNumber].count += incr
+			maxCount = max(maxCount, row[bucketNumber].count)
 
 		} else {
 			for local_incr := incr; local_incr > 0; local_incr-- {
 				decay := math.Pow(topk.decay, float64(count))
 				if rand.Float64() < decay {
-					topk.buckets[i][bucketNumber].count--
-					if topk.buckets[i][bucketNumber].count == 0 {
-						topk.buckets[i][bucketNumber].fingerprint = itemFingerprint
-						topk.buckets[i][bucketNumber].count = local_incr
+					row[bucketNumber].count--
+					if row[bucketNumber].count == 0 {
+						row[bucketNumber].fingerprint = itemFingerprint
+						row[bucketNumber].count = local_incr
 						maxCount = max(maxCount, local_incr)
 						break
 					}
@@ -92,17 +94,16 @@ func (topk *TopK) Add(item string, incr uint32) string {
 	}
 	minHeap := topk.minHeap.Min()
 	if len(topk.minHeap.Nodes) == int(topk.k) && maxCount < minHeap {
-		return ""
+		return "", false
 	}
+	// update minheap
 	itemHeapIdx, itemHeapExist := topk.minHeap.Find(item)
 	if itemHeapExist {
 		topk.minHeap.Fix(itemHeapIdx, maxCount)
-	} else {
-		expelled := topk.minHeap.Add(minheap.Node{Item: item, Count: maxCount})
-		return expelled
+		return "", true
 	}
-
-	return ""
+	expelled := topk.minHeap.Add(minheap.Node{Item: item, Count: maxCount})
+	return expelled, true
 }
 
 type bucket struct {
