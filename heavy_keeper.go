@@ -15,6 +15,7 @@ type TopK struct {
 	depth uint32
 	decay float64
 
+	r       *rand.Rand
 	buckets [][]bucket
 	minHeap *minheap.Heap
 }
@@ -31,6 +32,7 @@ func New(k, width, depth uint32, decay float64) *TopK {
 		depth:   depth,
 		decay:   decay,
 		buckets: arrays,
+		r:       rand.New(rand.NewSource(0)),
 		minHeap: minheap.NewHeap(k),
 	}
 
@@ -80,7 +82,7 @@ func (topk *TopK) Add(item string, incr uint32) (string, bool) {
 		} else {
 			for local_incr := incr; local_incr > 0; local_incr-- {
 				decay := math.Pow(topk.decay, float64(count))
-				if rand.Float64() < decay {
+				if topk.r.Float64() < decay {
 					row[bucketNumber].count--
 					if row[bucketNumber].count == 0 {
 						row[bucketNumber].fingerprint = itemFingerprint
