@@ -65,3 +65,47 @@ func BenchmarkAddwithLock(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkPow(b *testing.B) {
+	var value float64
+	for i := 0; i < b.N; i++ {
+		_ = math.Pow(0.925, float64(i))
+	}
+	_ = value
+}
+
+func BenchmarkPowLookup(b *testing.B) {
+	tables := make([]float64, 256)
+	for i := 0; i < 256; i++ {
+		tables[i] = math.Pow(0.925, float64(i))
+	}
+	b.ResetTimer()
+	var value float64
+	for j := 0; j < b.N; j++ {
+		if j < 256 {
+			value = tables[j]
+		} else {
+			value = math.Pow(tables[256], float64(j/256)) * tables[j%256]
+		}
+	}
+	_ = value
+}
+
+func TestPow(t *testing.T) {
+	tables := make([]float64, 256)
+	for i := 0; i < 256; i++ {
+		tables[i] = math.Pow(2, float64(i))
+	}
+	for j := 0; j < 1000; j++ {
+		var lvalue float64
+		var value float64
+		if j < 256 {
+			lvalue = tables[j]
+		} else {
+			lvalue = math.Pow(tables[255], float64(j/255)) * tables[j%255]
+		}
+		value = math.Pow(2, float64(j))
+		assert.Equal(t, lvalue, value)
+		t.Log("j:", j, "lvalue:", lvalue, "value:", value)
+	}
+}

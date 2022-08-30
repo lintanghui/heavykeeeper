@@ -9,11 +9,14 @@ import (
 	"github.com/spaolacci/murmur3"
 )
 
+const LOOKUP_TABLE = 256
+
 type TopK struct {
-	k     uint32
-	width uint32
-	depth uint32
-	decay float64
+	k           uint32
+	width       uint32
+	depth       uint32
+	decay       float64
+	lookupTable []float64
 
 	r       *rand.Rand
 	buckets [][]bucket
@@ -27,15 +30,18 @@ func New(k, width, depth uint32, decay float64) *TopK {
 	}
 
 	topk := TopK{
-		k:       k,
-		width:   width,
-		depth:   depth,
-		decay:   decay,
-		buckets: arrays,
-		r:       rand.New(rand.NewSource(0)),
-		minHeap: minheap.NewHeap(k),
+		k:           k,
+		width:       width,
+		depth:       depth,
+		decay:       decay,
+		lookupTable: make([]float64, LOOKUP_TABLE),
+		buckets:     arrays,
+		r:           rand.New(rand.NewSource(0)),
+		minHeap:     minheap.NewHeap(k),
 	}
-
+	for i := 0; i < LOOKUP_TABLE; i++ {
+		topk.lookupTable[i] = math.Pow(decay, float64(i))
+	}
 	return &topk
 }
 
@@ -80,14 +86,20 @@ func (topk *TopK) Add(item string, incr uint32) (string, bool) {
 			maxCount = max(maxCount, row[bucketNumber].count)
 
 		} else {
-			for local_incr := incr; local_incr > 0; local_incr-- {
-				decay := math.Pow(topk.decay, float64(count))
+			for localIncr := incr; localIncr > 0; localIncr-- {
+				var decay float64
+				curCount := row[bucketNumber].count
+				if row[bucketNumber].count < LOOKUP_TABLE {
+					decay = topk.lookupTable[curCount]
+				} else {
+					decay = math.Pow(topk.lookupTable[LOOKUP_TABLE-1], float64(curCount/(LOOKUP_TABLE-1))) * topk.lookupTable[curCount%(LOOKUP_TABLE-1)]
+				}
 				if topk.r.Float64() < decay {
 					row[bucketNumber].count--
 					if row[bucketNumber].count == 0 {
 						row[bucketNumber].fingerprint = itemFingerprint
-						row[bucketNumber].count = local_incr
-						maxCount = max(maxCount, local_incr)
+						row[bucketNumber].count = localIncr
+						maxCount = max(maxCount, localIncr)
 						break
 					}
 				}
